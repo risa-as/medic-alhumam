@@ -13,6 +13,7 @@ build
 # prisma generated client + local db
 packages/database/src/generated
 apps/desktop/src/generated
+apps/web/src/generated
 .prisma
 *.db
 *.db-journal

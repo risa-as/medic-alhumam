@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["@prisma/client", "bcryptjs"],
   outputFileTracingIncludes: {
-    "/*": ["../../packages/database/src/generated/client/**/*"],
+    "/*": ["./src/generated/client/**/*"],
   },
 };
 
