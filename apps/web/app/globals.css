@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ⤵ نصف قطر الزوايا الموحّد للمتجر (الأزرار/الكروت/العناصر الرئيسية).
+     غيّر هذه القيمة فقط ليُطبَّق على كامل المتجر. */
+  --radius: 5px;
+
+  --color-primary:        #1A5276;
+  --color-primary-hover:  #154360;
+  --color-primary-light:  #D6EAF8;
+  --color-bg:             #F0F4F8;
+  --color-surface:        #FFFFFF;
+  --color-sidebar:        #0D2137;
+  --color-sidebar-hover:  #1A3A52;
+  --color-sidebar-active: #1A5276;
+  --color-border:         #D5DCE8;
+  --color-border-light:   #EAF0F6;
+  --color-text:           #0D1B2A;
+  --color-text-secondary: #5A6A7E;
+  --color-text-muted:     #94A3B8;
+  --color-success:        #1A7F5A;
+  --color-success-light:  #D1FAE5;
+  --color-danger:         #B91C1C;
+  --color-danger-light:   #FEE2E2;
+  --color-warning:        #B45309;
+  --color-warning-light:  #FEF3C7;
+  --color-info:           #1D4ED8;
+  --color-info-light:     #DBEAFE;
+  --shadow-sm:   0 1px 3px rgba(13,27,42,0.08);
+  --shadow-md:   0 2px 8px rgba(13,27,42,0.10);
+  --shadow-lg:   0 4px 16px rgba(13,27,42,0.14);
+}
+
+html {
+  font-family: var(--font-app), "Segoe UI", Tahoma, system-ui, -apple-system, sans-serif;
+  direction: rtl;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* ─── Animations ─── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.93); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+@keyframes rowDelete {
+  0%   { background-color: inherit; }
+  30%  { background-color: #FEE2E2; }
+  100% { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+}
+
+.modal-overlay {
+  animation: fadeIn 150ms ease-out;
+}
+
+.modal-box {
+  animation: scaleIn 200ms ease-out;
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.spinner-dark {
+  border-color: rgba(13,27,42,0.2);
+  border-top-color: var(--color-text);
+}
+
+/* ─── Sidebar logout button ─── */
+.sidebar-logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  text-align: right;
+  background: transparent;
+  color: rgba(255,255,255,0.55);
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+.sidebar-logout-btn:hover {
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+}
+
+/* ─── Sidebar nav link active state ─── */
+.sidebar-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.75);
+  text-decoration: none;
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+.sidebar-nav-link:hover {
+  background: #1A3A52;
+  color: #fff;
+}
+.sidebar-nav-link.active {
+  background: var(--color-sidebar-active);
+  color: #fff;
+  font-weight: 600;
+  /* شريط تمييز على الحافة اليمنى (RTL) */
+  box-shadow: inset -3px 0 0 0 var(--color-primary-light);
+}
+.sidebar-nav-link.active:hover {
+  background: var(--color-sidebar-active);
+}
+
+/* ─── Row delete animation ─── */
+tr.row-deleting td {
+  animation: rowDelete 400ms ease-out forwards;
+  pointer-events: none;
+}

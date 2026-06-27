@@ -1,0 +1,95 @@
+// مخطط Prisma المحلي لتطبيق سطح المكتب (SQLite، Offline-first).
+// مرآة المنتجات + فواتير محلية + طابور مزامنة (Phase 3 / T020).
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./medic-local.db"
+}
+
+// مرآة المنتجات (تُملأ من /api/sync/pull)
+model LocalProduct {
+  id          String  @id
+  nameAr      String
+  sku         String  @unique
+  salePrice   Float
+  quantity    Int     @default(0)
+  minQuantity Int     @default(0)
+  isOnline    Boolean @default(false)
+  updatedAt   String
+}
+
+// مرآة المستخدمين (تُملأ من /api/sync/pull) — لتسجيل الدخول الأوفلاين متعدد المستخدمين (FR-052)
+model LocalUser {
+  id           String @id
+  name         String
+  email        String @unique
+  passwordHash String
+  role         String // ADMIN | CASHIER
+  updatedAt    String
+}
+
+// مرآة الزبائن (تُملأ من /api/sync/pull) — لبحث/إكمال الزبائن في نقطة البيع دون اتصال
+model LocalCustomer {
+  id        String  @id
+  name      String
+  phone     String?
+  address   String?
+  balance   Float   @default(0) // رصيد الدين المفتوح/الجزئي لحظة آخر مزامنة
+  updatedAt String
+}
+
+// فاتورة محلية (تُكتب فورًا حتى دون اتصال)
+model LocalSale {
+  id            String          @id @default(cuid())
+  clientEventId String          @unique
+  invoiceNo     String
+  // المستخدم الفعّال لحظة إنشاء الفاتورة (FR-047) — يُرسَل في حدث المزامنة
+  userId        String?
+  customerName  String?
+  customerPhone String?
+  subtotal      Float
+  discount      Float           @default(0)
+  total         Float
+  paid          Float           @default(0)
+  remaining     Float           @default(0)
+  paymentType   String
+  // عُلِّمت صحيحًا إذا عُدِّل سعر أحد أصنافها يدويًا في نقطة البيع (يختلف عن سعر البيع المعرَّف)
+  priceEdited   Boolean         @default(false)
+  synced        Boolean         @default(false)
+  createdAt     String
+  items         LocalSaleItem[]
+}
+
+model LocalSaleItem {
+  id           String    @id @default(cuid())
+  saleId       String
+  sale         LocalSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId    String
+  nameAr       String
+  quantity     Int
+  unitPrice    Float
+  lineDiscount Float     @default(0)
+  lineTotal    Float
+}
+
+// طابور المزامنة (outbox)
+model SyncQueueItem {
+  id            String  @id @default(cuid())
+  clientEventId String  @unique
+  payload       String // JSON: SaleSyncEvent
+  status        String  @default("PENDING") // PENDING | SYNCED | FAILED
+  attempts      Int     @default(0)
+  lastError     String?
+  createdAt     String
+}
+
+// قيم متفرقة (lastPullAt, deviceId...)
+model Meta {
+  key   String @id
+  value String
+}

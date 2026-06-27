@@ -1,0 +1,353 @@
+// مخطط Prisma للخادم المركزي (PostgreSQL على Neon).
+// يعكس الكيانات في specs/001-medic-store-system/data-model.md (Phase 2 / T007).
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ---------- Enums ----------
+enum Role {
+  ADMIN
+  CASHIER
+}
+
+enum PaymentType {
+  CASH
+  CREDIT
+  PARTIAL
+}
+
+enum MovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  RETURN
+}
+
+enum DebtStatus {
+  OPEN
+  PARTIAL
+  PAID
+}
+
+enum OrderSource {
+  WEBSITE
+  LANDING_PAGE
+  FACEBOOK
+  INSTAGRAM
+  OTHER
+}
+
+enum OrderStatus {
+  HOME
+  PENDING
+  COMPLETED
+  RETURNED
+  CANCELLED
+  DELETED
+}
+
+enum SalePlatform {
+  POS_DESKTOP
+  POS_MOBILE
+  WEB
+}
+
+enum ExpenseCategory {
+  RENT
+  SALARIES
+  UTILITIES
+  PURCHASES
+  MAINTENANCE
+  MARKETING
+  TRANSPORT
+  OTHER
+}
+
+// ---------- Catalog ----------
+model Category {
+  id        String    @id @default(cuid())
+  nameAr    String    @unique
+  createdAt DateTime  @default(now())
+  products  Product[]
+}
+
+model Product {
+  id           String          @id @default(cuid())
+  nameAr       String
+  sku          String          @unique
+  categoryId   String
+  category     Category        @relation(fields: [categoryId], references: [id])
+  costPrice    Decimal         @db.Decimal(14, 3)
+  salePrice    Decimal         @db.Decimal(14, 3)
+  // السعر قبل الخصم (اختياري). يُعرض مشطوبًا في المتجر مع شارة نسبة الخصم عندما يفوق salePrice.
+  compareAtPrice Decimal?      @db.Decimal(14, 3)
+  // سعر التوصيل المعروض للزبون (يظهر بجانب سعر المنتج في صفحة الهبوط). 0 = توصيل مجاني/غير محدّد.
+  deliveryPrice Decimal        @default(0) @db.Decimal(14, 3)
+  quantity     Int             @default(0)
+  minQuantity  Int             @default(0)
+  images       String[]        @default([])
+  videoUrl     String?
+  description  String?
+  isOnline     Boolean         @default(false)
+  // تعريف الحقول المخصّصة: [{ id, name, type: "select"|"text", options?: string[], required: boolean }]
+  customFields Json            @default("[]")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  saleItems    SaleItem[]
+  orderItems   OrderItem[]
+  movements    StockMovement[]
+  batches      ProductBatch[]
+
+  @@index([categoryId])
+  @@index([isOnline])
+}
+
+// دفعة مخزون (شحنة) — أساس حساب التكلفة بنظام FEFO.
+// كل عملية شراء تُنشئ دفعة بسعر شرائها الخاص؛ ويُستهلك المتبقّي عند البيع
+// بترتيب: الأقرب انتهاءً (expiryDate) ثم الأقدم استلامًا (receivedAt).
+model ProductBatch {
+  id         String    @id @default(cuid())
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id])
+  costPrice  Decimal   @db.Decimal(14, 3)
+  quantity   Int       // الكمية المستلمة في الشحنة
+  remaining  Int       // المتبقّي القابل للاستهلاك
+  expiryDate DateTime? // تاريخ الصلاحية (اختياري؛ يُفعّل ترتيب FEFO الكامل)
+  receivedAt DateTime  @default(now())
+  reason     String?
+  createdAt  DateTime  @default(now())
+
+  @@index([productId])
+  @@index([expiryDate])
+  @@index([productId, remaining])
+}
+
+model StockMovement {
+  id          String       @id @default(cuid())
+  productId   String
+  product     Product      @relation(fields: [productId], references: [id])
+  type        MovementType
+  quantity    Int
+  reason      String?
+  // علامة تسوية ناتجة عن تعارض مزامنة (أوفلاين/أونلاين) تحتاج مراجعة المدير (FR-049)
+  needsReview Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+
+  @@index([productId])
+  @@index([needsReview])
+}
+
+// ---------- Customers & Sales ----------
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+  sales     Sale[]
+  debts     Debt[]
+}
+
+model Sale {
+  id            String    @id @default(cuid())
+  invoiceNo     String    @unique
+  // معرّف حدث العميل لمنع تكرار المزامنة (idempotency) من الديسكتوب
+  clientEventId String?   @unique
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  // لقطة بيانات الزبون للبيع غير المرتبط بسجل زبون (offline walk-in)
+  customerName  String?
+  customerPhone String?
+  subtotal      Decimal   @db.Decimal(14, 3)
+  discount    Decimal     @default(0) @db.Decimal(14, 3)
+  total       Decimal     @db.Decimal(14, 3)
+  paid        Decimal     @default(0) @db.Decimal(14, 3)
+  remaining   Decimal     @default(0) @db.Decimal(14, 3)
+  paymentType PaymentType
+  platform    SalePlatform @default(WEB)
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  createdAt   DateTime    @default(now())
+  items       SaleItem[]
+  debt        Debt?
+
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+model SaleItem {
+  id           String  @id @default(cuid())
+  saleId       String
+  sale         Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  quantity     Int
+  unitPrice    Decimal @db.Decimal(14, 3)
+  lineDiscount Decimal @default(0) @db.Decimal(14, 3)
+  lineTotal    Decimal @db.Decimal(14, 3)
+  // تكلفة البضاعة المباعة لهذا السطر (مجموع تخصيص دفعات FEFO).
+  // null للفواتير القديمة قبل تفعيل تتبّع التكلفة (التتبّع يبدأ من الآن).
+  costTotal    Decimal? @db.Decimal(14, 3)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Debt {
+  id         String        @id @default(cuid())
+  customerId String
+  customer   Customer      @relation(fields: [customerId], references: [id])
+  saleId     String?       @unique
+  sale       Sale?         @relation(fields: [saleId], references: [id])
+  amount     Decimal       @db.Decimal(14, 3)
+  paid       Decimal       @default(0) @db.Decimal(14, 3)
+  status     DebtStatus    @default(OPEN)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  payments   DebtPayment[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model DebtPayment {
+  id        String   @id @default(cuid())
+  debtId    String
+  debt      Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(14, 3)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([debtId])
+}
+
+// ---------- Orders ----------
+model Order {
+  id              String      @id @default(cuid())
+  orderNo         String      @unique
+  customerName    String
+  customerPhone   String
+  governorate     String
+  customerAddress String?
+  source          OrderSource @default(WEBSITE)
+  clientEventId   String?     @unique
+  status          OrderStatus @default(HOME)
+  total           Decimal     @db.Decimal(14, 3)
+  // تكلفة التوصيل الفعلية التي تدفعها المتجر لشركة التوصيل (لقطة لحظية عند إنشاء الطلب
+  // حسب المحافظة: بغداد أو بقية المحافظات). null للطلبات القديمة قبل تفعيل التتبّع.
+  actualDeliveryCost Decimal? @db.Decimal(14, 3)
+  // ملاحظات إدارية على الطلب (تُعرض وتُحرَّر في صفحة الطلبات).
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  items           OrderItem[]
+
+  @@index([status])
+  @@index([source])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id                 String  @id @default(cuid())
+  orderId            String
+  order              Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId          String
+  product            Product @relation(fields: [productId], references: [id])
+  quantity           Int
+  unitPrice          Decimal @db.Decimal(14, 3)
+  // القيم المختارة للحقول المخصّصة كنسخة لحظية: { "اللون": "أحمر", "القياس": "متوسط" }
+  selectedAttributes Json    @default("{}")
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// ---------- Auth & Settings ----------
+model User {
+  id            String        @id @default(cuid())
+  name          String
+  email         String        @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String
+  role          Role          @default(CASHIER)
+  createdAt     DateTime      @default(now())
+  accounts      Account[]
+  sessions      Session[]
+  sales         Sale[]
+  debtPayments  DebtPayment[]
+  expenses      Expense[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Setting {
+  id            String   @id @default(cuid())
+  storeName     String   @default("متجر المستلزمات الطبية")
+  logoUrl       String?
+  currency      String   @default("IQD")
+  printerConfig Json     @default("{}")
+  // أسعار التوصيل الفعلية القابلة للتغيير (تُضبط في صفحة الإعدادات). تُستخدم لاحتساب
+  // Order.actualDeliveryCost عند إنشاء كل طلب حسب المحافظة (بغداد مقابل بقية المحافظات).
+  deliveryCostBaghdad Decimal @default(4000) @db.Decimal(14, 3)
+  deliveryCostOther   Decimal @default(6000) @db.Decimal(14, 3)
+  updatedAt     DateTime @updatedAt
+}
+
+// ---------- Expenses ----------
+// المصروفات التشغيلية (إيجار/رواتب/فواتير...) — تُطرح من ربح البضاعة لحساب صافي الربح.
+model Expense {
+  id        String          @id @default(cuid())
+  amount    Decimal         @db.Decimal(14, 3)
+  category  ExpenseCategory @default(OTHER)
+  note      String?
+  // تاريخ صرف المبلغ (قد يختلف عن تاريخ الإدخال)
+  spentAt   DateTime        @default(now())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  createdAt DateTime        @default(now())
+
+  @@index([spentAt])
+  @@index([category])
+}

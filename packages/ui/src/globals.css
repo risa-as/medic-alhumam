@@ -1,0 +1,5 @@
+/* أنماط أساسية مشتركة لـ Tailwind + shadcn/ui (RTL).
+   تُستورد من تطبيق الويب. متغيّرات الثيم تُضاف عند تهيئة shadcn بالكامل. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

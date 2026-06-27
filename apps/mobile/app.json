@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "متجر المستلزمات الطبية",
+    "slug": "medic-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "medic",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.medic.mobile"
+    },
+    "android": {
+      "package": "com.medic.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#1A5276"
+      },
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "نستخدم الكاميرا لمسح باركود المنتجات في نقطة البيع."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "نستخدم معرض الصور لرفع صور وفيديو المنتجات."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "defaultServerUrl": "http://localhost:3000"
+    }
+  }
+}
