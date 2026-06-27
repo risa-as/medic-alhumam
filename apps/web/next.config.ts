@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "utfs.io", pathname: "/f/**" },
     ],
   },
-  serverExternalPackages: ["@prisma/client", "@medic/database", "bcryptjs"],
+  serverExternalPackages: ["@prisma/client", "bcryptjs"],
   experimental: {
     outputFileTracingIncludes: {
       "/*": ["../../packages/database/src/generated/client/**/*"],
