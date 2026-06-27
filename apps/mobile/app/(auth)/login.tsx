@@ -43,66 +43,70 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {/* الترويسة المتدرّجة */}
-        <LinearGradient colors={gradients.primary} style={[styles.header, { paddingTop: insets.top + spacing.xxxl }]}>
-          <View style={styles.logo}>
-            <Stethoscope size={40} color={colors.white} strokeWidth={2} />
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <LinearGradient colors={gradients.primary} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between" }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {/* الترويسة */}
+          <View style={[styles.header, { paddingTop: insets.top + spacing.xxxl }]}>
+            <View style={styles.logo}>
+              <Stethoscope size={28} color={colors.white} strokeWidth={2} />
+            </View>
+            <Text style={styles.brand}>الهمام</Text>
+            <Text style={styles.brandSub}>نظام إدارة المتجر</Text>
           </View>
-          <Text style={styles.brand}>المستلزمات الطبية</Text>
-          <Text style={styles.brandSub}>نظام إدارة المتجر</Text>
-        </LinearGradient>
 
-        {/* البطاقة */}
-        <View style={styles.body}>
-          <View style={styles.card}>
-            <Text style={styles.title}>تسجيل الدخول</Text>
-            <Text style={styles.subtitle}>أدخل بياناتك للمتابعة</Text>
+          {/* البطاقة */}
+          <View style={styles.body}>
+            <View style={styles.card}>
+              <Text style={styles.title}>تسجيل الدخول</Text>
+              <Text style={styles.subtitle}>أدخل بياناتك للمتابعة</Text>
 
-            <Text style={styles.label}>البريد الإلكتروني</Text>
-            <View style={styles.field}>
-              <Mail size={18} color={colors.muted} strokeWidth={2} />
-              <TextInput
-                style={styles.input}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                placeholder="name@medic.local"
-                placeholderTextColor={colors.muted}
-              />
-            </View>
-
-            <Text style={styles.label}>كلمة المرور</Text>
-            <View style={styles.field}>
-              <Lock size={18} color={colors.muted} strokeWidth={2} />
-              <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!show}
-                placeholder="••••••••"
-                placeholderTextColor={colors.muted}
-                onSubmitEditing={submit}
-              />
-              <TouchableOpacity onPress={() => setShow((s) => !s)} hitSlop={10}>
-                {show ? <EyeOff size={18} color={colors.muted} strokeWidth={2} /> : <Eye size={18} color={colors.muted} strokeWidth={2} />}
-              </TouchableOpacity>
-            </View>
-
-            {error && (
-              <View style={styles.errorBox}>
-                <TriangleAlert size={15} color={colors.danger} strokeWidth={2.2} />
-                <Text style={styles.errorText}>{error}</Text>
+              <Text style={styles.label}>البريد الإلكتروني</Text>
+              <View style={styles.field}>
+                <Mail size={18} color={colors.muted} strokeWidth={2} />
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  placeholder="name@medic.local"
+                  placeholderTextColor={colors.muted}
+                />
               </View>
-            )}
 
-            <Button title="تسجيل الدخول" onPress={submit} loading={loading} size="lg" style={{ marginTop: spacing.xl }} />
+              <Text style={styles.label}>كلمة المرور</Text>
+              <View style={styles.field}>
+                <Lock size={18} color={colors.muted} strokeWidth={2} />
+                <TextInput
+                  style={styles.input}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!show}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.muted}
+                  onSubmitEditing={submit}
+                />
+                <TouchableOpacity onPress={() => setShow((s) => !s)} hitSlop={10}>
+                  {show ? <EyeOff size={18} color={colors.muted} strokeWidth={2} /> : <Eye size={18} color={colors.muted} strokeWidth={2} />}
+                </TouchableOpacity>
+              </View>
+
+              {error && (
+                <View style={styles.errorBox}>
+                  <TriangleAlert size={15} color={colors.danger} strokeWidth={2.2} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
+
+              <Button title="تسجيل الدخول" onPress={submit} loading={loading} size="lg" style={{ marginTop: spacing.xl }} />
+            </View>
           </View>
-        </View>
-      </ScrollView>
+
+          <View style={{ height: insets.bottom + spacing.xl }} />
+        </ScrollView>
+      </LinearGradient>
     </KeyboardAvoidingView>
   );
 }
@@ -110,14 +114,12 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
-    paddingBottom: spacing.xxxl + spacing.xl,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    paddingBottom: spacing.xxl,
   },
   logo: {
-    width: 84,
-    height: 84,
-    borderRadius: 26,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
@@ -125,12 +127,12 @@ const styles = StyleSheet.create({
   brand: { color: colors.white, fontSize: font.xxl, fontWeight: "800", marginTop: spacing.lg },
   brandSub: { color: "rgba(255,255,255,0.82)", fontSize: font.base, marginTop: 4 },
 
-  body: { paddingHorizontal: spacing.lg, marginTop: -spacing.xxxl },
+  body: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   card: { backgroundColor: colors.card, borderRadius: radius.xl, padding: spacing.xxl, ...shadow.lg },
-  title: { fontSize: font.xl, fontWeight: "800", textAlign: "right", color: colors.text },
-  subtitle: { fontSize: font.sm, color: colors.textSecondary, textAlign: "right", marginTop: 2, marginBottom: spacing.lg },
+  title: { fontSize: font.xl, fontWeight: "800", textAlign: "center", color: colors.text },
+  subtitle: { fontSize: font.sm, color: colors.textSecondary, textAlign: "left", marginTop: 2, marginBottom: spacing.lg },
 
-  label: { fontSize: font.sm, color: colors.textSecondary, marginBottom: 6, marginTop: spacing.md, textAlign: "right", fontWeight: "600" },
+  label: { fontSize: font.sm, color: colors.textSecondary, marginBottom: 6, marginTop: spacing.md, textAlign: "left", fontWeight: "600" },
   field: {
     flexDirection: "row",
     alignItems: "center",
@@ -141,7 +143,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     backgroundColor: colors.bg,
   },
-  input: { flex: 1, paddingVertical: 13, fontSize: font.base, textAlign: "right", color: colors.text },
+  input: { flex: 1, paddingVertical: 13, fontSize: font.base, textAlign: "left", color: colors.text },
 
   errorBox: {
     flexDirection: "row",
@@ -152,5 +154,5 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginTop: spacing.lg,
   },
-  errorText: { color: colors.danger, fontSize: font.sm, flex: 1, textAlign: "right", fontWeight: "600" },
+  errorText: { color: colors.danger, fontSize: font.sm, flex: 1, textAlign: "left", fontWeight: "600" },
 });
