@@ -2,8 +2,9 @@
 // يعكس الكيانات في specs/001-medic-store-system/data-model.md (Phase 2 / T007).
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/client"
+  provider      = "prisma-client-js"
+  output        = "../src/generated/client"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
