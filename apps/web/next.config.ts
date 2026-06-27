@@ -9,8 +9,11 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "utfs.io", pathname: "/f/**" },
     ],
   },
+  serverExternalPackages: ["@prisma/client", "@medic/database", "bcryptjs"],
   experimental: {
-    // الحزم الخارجية للخادم (Prisma) تبقى خارج الحزم المُحوّلة
+    outputFileTracingIncludes: {
+      "/*": ["../../packages/database/src/generated/client/**/*"],
+    },
   },
 };
 
