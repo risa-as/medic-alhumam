@@ -9,7 +9,7 @@ import {
   type SalesFilter,
 } from "./sales";
 import { syncNow, getSyncStatus, testConnection } from "./sync";
-import { fetchDebtsFromServer, payCustomerDebtOnServer } from "./debts";
+import { fetchDebtsFromServer, payCustomerDebtOnServer, fetchCustomerStatementFromServer } from "./debts";
 import { readLocalConfig, writeLocalConfig } from "./local-config";
 import { config } from "./config";
 import { login, logout, getCurrentUser } from "./auth";
@@ -50,8 +50,9 @@ export function registerIpc(): void {
     platform: process.platform,
     userDataPath: app.getPath("userData"),
   }));
-  ipcMain.handle("debts:list", (_e, status?: string) => fetchDebtsFromServer(status));
+  ipcMain.handle("debts:list", (_e, status?: string, search?: string) => fetchDebtsFromServer(status, search));
   ipcMain.handle("debts:payCustomer", (_e, customerId: string, amount: number) => payCustomerDebtOnServer(customerId, amount));
+  ipcMain.handle("debts:customerStatement", (_e, customerId: string) => fetchCustomerStatementFromServer(customerId));
   ipcMain.handle("settings:getLocal", () => ({
     serverUrl: config.serverUrl,
     syncSecret: config.syncSecret,

@@ -1,17 +1,12 @@
 // يستعلم ديون الزبائن مباشرة من الخادم (يتطلب اتصالًا + تسجيل دخول أونلاين).
-// يُعرض في صفحة دفتر الديون بالديسكتوب كعرض قراءة.
-// ملاحظة: مسارات /api/debts محميّة بهويّة المستخدم (requireRole) لا بمفتاح المزامنة،
-// لذا نُصادق بتوكن JWT الخاص بالمستخدم (getCurrentUser().token) لا بـ syncSecret.
 import { apiBaseUrl } from "./config";
 import { getCurrentUser } from "./auth";
 
-/** ترويسة موثّقة بالمستخدم (Bearer JWT) — أو null إن لم يكن هناك توكن (دخول أوفلاين/غير مسجّل). */
 function userAuthHeader(): Record<string, string> | null {
   const token = getCurrentUser()?.token;
   return token ? { Authorization: `Bearer ${token}` } : null;
 }
 
-/** فاتورة دين مفردة ضمن مجموعة زبون. */
 export interface DebtInvoice {
   id: string;
   invoiceNo: string | null;
@@ -22,9 +17,8 @@ export interface DebtInvoice {
   createdAt: string;
 }
 
-/** ديون زبون واحد مُجمّعة (يطابق شكل /api/debts المُجمّع). */
 export interface CustomerDebtGroup {
-  id: string; // = customerId (مفتاح صفّ الجدول)
+  id: string;
   customerId: string;
   customerName: string;
   customerPhone: string | null;
@@ -45,12 +39,38 @@ export interface DebtListResult {
   error?: string;
 }
 
-export async function fetchDebtsFromServer(status?: string): Promise<DebtListResult> {
+export interface StatementEntry {
+  id: string;
+  type: "DEBT" | "PAYMENT";
+  date: string;
+  invoiceNo?: string | null;
+  amount: number;
+  paid?: number;
+  remaining?: number;
+  status?: string;
+  note?: string | null;
+}
+
+export interface CustomerStatementResult {
+  entries: StatementEntry[];
+  totalDebt: number;
+  totalPaid: number;
+  balance: number;
+  online: boolean;
+  error?: string;
+}
+
+/** يجلب الديون مع دعم الفلتر والبحث. */
+export async function fetchDebtsFromServer(status?: string, search?: string): Promise<DebtListResult> {
   const auth = userAuthHeader();
   if (!auth) {
     return { data: [], totalAmount: 0, totalPaid: 0, totalRemaining: 0, online: false, error: "يجب تسجيل الدخول أونلاين لعرض الديون" };
   }
-  const url = `${apiBaseUrl}/debts${status ? `?status=${status}` : ""}`;
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (search?.trim()) params.set("search", search.trim());
+  const qs = params.toString();
+  const url = `${apiBaseUrl}/debts${qs ? `?${qs}` : ""}`;
   try {
     const res = await fetch(url, { headers: auth });
     if (res.status === 401 || res.status === 403) {
@@ -59,26 +79,19 @@ export async function fetchDebtsFromServer(status?: string): Promise<DebtListRes
     if (!res.ok) {
       return { data: [], totalAmount: 0, totalPaid: 0, totalRemaining: 0, online: true, error: `خطأ ${res.status}` };
     }
-    // الخادم يعيد الديون مُجمّعة حسب الزبون (صفّ واحد لكل زبون + فواتيره)
     const raw = (await res.json()) as {
       data: CustomerDebtGroup[];
       totalAmount: number;
       totalPaid: number;
       totalRemaining: number;
     };
-    return {
-      data: raw.data,
-      totalAmount: raw.totalAmount,
-      totalPaid: raw.totalPaid,
-      totalRemaining: raw.totalRemaining,
-      online: true,
-    };
+    return { data: raw.data, totalAmount: raw.totalAmount, totalPaid: raw.totalPaid, totalRemaining: raw.totalRemaining, online: true };
   } catch {
     return { data: [], totalAmount: 0, totalPaid: 0, totalRemaining: 0, online: false, error: "تعذّر الوصول للخادم" };
   }
 }
 
-/** يسجّل دفعة سداد على حساب الزبون (تُوزَّع على فواتيره الأقدم أولًا على الخادم). */
+/** يسجّل دفعة سداد على حساب الزبون. */
 export async function payCustomerDebtOnServer(customerId: string, amount: number): Promise<{ ok: boolean; error?: string }> {
   const auth = userAuthHeader();
   if (!auth) return { ok: false, error: "يجب تسجيل الدخول أونلاين لتسجيل دفعة" };
@@ -95,5 +108,21 @@ export async function payCustomerDebtOnServer(customerId: string, amount: number
     return { ok: true };
   } catch {
     return { ok: false, error: "تعذّر الوصول للخادم" };
+  }
+}
+
+/** يجلب كشف حساب الزبون (ديون + دفعات) من الخادم. */
+export async function fetchCustomerStatementFromServer(customerId: string): Promise<CustomerStatementResult> {
+  const auth = userAuthHeader();
+  if (!auth) return { entries: [], totalDebt: 0, totalPaid: 0, balance: 0, online: false, error: "يجب تسجيل الدخول أونلاين" };
+  try {
+    const res = await fetch(`${apiBaseUrl}/customers/${customerId}/statement`, { headers: auth });
+    if (!res.ok) {
+      return { entries: [], totalDebt: 0, totalPaid: 0, balance: 0, online: true, error: `خطأ ${res.status}` };
+    }
+    const raw = (await res.json()) as CustomerStatementResult;
+    return { ...raw, online: true };
+  } catch {
+    return { entries: [], totalDebt: 0, totalPaid: 0, balance: 0, online: false, error: "تعذّر الوصول للخادم" };
   }
 }

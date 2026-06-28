@@ -238,7 +238,7 @@ function DetailPanel({
         {/* الأزرار */}
         <div style={{ display: "flex", gap: 8 }}>
           <Btn variant="secondary" size="sm" onClick={onEdit}><Pencil size={14} /> تعديل</Btn>
-          <Btn variant="danger"    size="sm" onClick={onDelete}><Trash2 size={14} /> حذف</Btn>
+          <Btn variant="ghost" size="sm" onClick={onDelete} style={{ color: "var(--color-danger)" }}><Trash2 size={14} /> حذف</Btn>
         </div>
       </div>
 

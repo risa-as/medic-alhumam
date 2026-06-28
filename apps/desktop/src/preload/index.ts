@@ -12,8 +12,9 @@ const api = {
   testConnection: (serverUrl: string, syncSecret: string) =>
     ipcRenderer.invoke("sync:testConnection", serverUrl, syncSecret),
   appInfo: () => ipcRenderer.invoke("app:info"),
-  listDebts: (status?: string) => ipcRenderer.invoke("debts:list", status),
+  listDebts: (status?: string, search?: string) => ipcRenderer.invoke("debts:list", status, search),
   payCustomerDebt: (customerId: string, amount: number) => ipcRenderer.invoke("debts:payCustomer", customerId, amount),
+  getCustomerStatement: (customerId: string) => ipcRenderer.invoke("debts:customerStatement", customerId),
   getLocalSettings: () => ipcRenderer.invoke("settings:getLocal"),
   saveLocalSettings: (cfg: { serverUrl?: string; syncSecret?: string }) =>
     ipcRenderer.invoke("settings:saveLocal", cfg),

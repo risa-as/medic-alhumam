@@ -43,10 +43,18 @@
     },
     "files": [
       "out/**/*",
-      "generated/prisma/**/*"
+      "generated/prisma/**/*",
+      "prisma/**/*",
+      "node_modules/.bin/prisma*",
+      "node_modules/@prisma/**/*",
+      "node_modules/prisma/**/*"
     ],
     "asarUnpack": [
-      "generated/prisma/**/*"
+      "generated/prisma/**/*",
+      "prisma/**/*",
+      "node_modules/.bin/prisma*",
+      "node_modules/@prisma/**/*",
+      "node_modules/prisma/**/*"
     ],
     "win": {
       "icon": "build/icon.png",
