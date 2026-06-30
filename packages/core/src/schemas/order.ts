@@ -28,7 +28,15 @@ export const orderStatusUpdateSchema = z.object({
 });
 export type OrderStatusUpdateInput = z.infer<typeof orderStatusUpdateSchema>;
 
-/** تعديل بيانات الطلب من لوحة الإدارة: تفاصيل الزبون + تكلفة التوصيل الفعلية + الملاحظات. */
+/** تعديل صنف موجود في الطلب (الكمية والسعر) — يُحدَّد بمعرّف الصنف. */
+export const orderItemUpdateSchema = z.object({
+  id: idSchema,
+  quantity: positiveIntSchema,
+  unitPrice: amountSchema,
+});
+export type OrderItemUpdate = z.infer<typeof orderItemUpdateSchema>;
+
+/** تعديل بيانات الطلب من لوحة الإدارة: تفاصيل الزبون + تكلفة التوصيل الفعلية + الملاحظات + كميات/أسعار الأصناف. */
 export const orderUpdateSchema = z.object({
   customerName: z.string().min(1, "الاسم مطلوب").optional(),
   customerPhone: z.string().min(1, "رقم الهاتف مطلوب").optional(),
@@ -37,6 +45,8 @@ export const orderUpdateSchema = z.object({
   // null = إزالة القيمة المخزّنة (الرجوع للحساب التلقائي من الإعدادات).
   actualDeliveryCost: amountSchema.nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
+  // تعديل كميات وأسعار الأصناف؛ يُعاد حساب إجمالي الطلب على الخادم.
+  items: z.array(orderItemUpdateSchema).min(1).optional(),
 });
 export type OrderUpdateInput = z.infer<typeof orderUpdateSchema>;
 

@@ -30,6 +30,8 @@ export const expenseCategoryEnum = z.enum([
   "TRANSPORT",
   "OTHER",
 ]);
+export const salePlatformEnum = z.enum(["POS_DESKTOP", "POS_MOBILE", "WEB"]);
+export const shiftStatusEnum = z.enum(["OPEN", "CLOSED"]);
 
 export type Role = z.infer<typeof roleEnum>;
 export type PaymentType = z.infer<typeof paymentTypeEnum>;
@@ -38,3 +40,5 @@ export type DebtStatus = z.infer<typeof debtStatusEnum>;
 export type OrderSource = z.infer<typeof orderSourceEnum>;
 export type OrderStatus = z.infer<typeof orderStatusEnum>;
 export type ExpenseCategory = z.infer<typeof expenseCategoryEnum>;
+export type SalePlatform = z.infer<typeof salePlatformEnum>;
+export type ShiftStatus = z.infer<typeof shiftStatusEnum>;

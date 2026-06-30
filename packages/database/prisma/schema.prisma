@@ -72,6 +72,11 @@ enum ExpenseCategory {
   OTHER
 }
 
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
 // ---------- Catalog ----------
 model Category {
   id        String    @id @default(cuid())
@@ -173,15 +178,46 @@ model Sale {
   paid        Decimal     @default(0) @db.Decimal(14, 3)
   remaining   Decimal     @default(0) @db.Decimal(14, 3)
   paymentType PaymentType
+  // طريقة الدفع في نقطة البيع: CASH | CARD | CREDIT (لتفصيل مبالغ الوردية). null للبيانات القديمة.
+  paymentMethod String?
   platform    SalePlatform @default(WEB)
   userId      String
   user        User        @relation(fields: [userId], references: [id])
+  // الوردية التي سُجِّلت فيها الفاتورة (نقطة البيع). null لمبيعات لا تتبع وردية (مثلاً الويب).
+  shiftId     String?
+  shift       Shift?      @relation(fields: [shiftId], references: [id])
   createdAt   DateTime    @default(now())
   items       SaleItem[]
   debt        Debt?
 
   @@index([customerId])
   @@index([createdAt])
+  @@index([shiftId])
+}
+
+// وردية عمل (نقطة بيع) لمستخدم على جهاز: تُفتح برصيد نقدي افتتاحي، وتُسجَّل فيها الفواتير،
+// ثم تُغلق بعدّ النقد الفعلي لمقارنته بالمتوقَّع (الافتتاحي + النقد المحصّل). تُزامَن من
+// الديسكتوب الأوفلاين عبر clientEventId (idempotent) ومن الهاتف مباشرةً عبر الـ API.
+model Shift {
+  id                 String      @id @default(cuid())
+  // معرّف حدث العميل لمنع تكرار المزامنة (idempotency) من الديسكتوب
+  clientEventId      String?     @unique
+  userId             String
+  user               User        @relation(fields: [userId], references: [id])
+  platform           SalePlatform @default(POS_DESKTOP)
+  // النقد الموجود في الصندوق عند فتح الوردية
+  openingFloat       Decimal     @default(0) @db.Decimal(14, 3)
+  // النقد المعدود فعليًّا عند الإغلاق (null ما دامت الوردية مفتوحة)
+  closingCountedCash Decimal?    @db.Decimal(14, 3)
+  status             ShiftStatus @default(OPEN)
+  openedAt           DateTime    @default(now())
+  closedAt           DateTime?
+  note               String?
+  sales              Sale[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([openedAt])
 }
 
 model SaleItem {
@@ -287,6 +323,7 @@ model User {
   sales         Sale[]
   debtPayments  DebtPayment[]
   expenses      Expense[]
+  shifts        Shift[]
 }
 
 model Account {

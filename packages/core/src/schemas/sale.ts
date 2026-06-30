@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { idSchema, amountSchema, positiveIntSchema } from "./common";
 import { paymentTypeEnum } from "../enums";
+import { shiftSyncEventSchema } from "./shift";
 
 export const saleItemInputSchema = z.object({
   productId: idSchema,
@@ -47,11 +48,18 @@ export const saleSyncEventSchema = z.object({
   paid: amountSchema,
   remaining: amountSchema,
   paymentType: paymentTypeEnum,
+  // طريقة الدفع في نقطة البيع (نقدي/بطاقة/آجل) لتفصيل مبالغ الوردية (اختياري).
+  paymentMethod: z.enum(["CASH", "CARD", "CREDIT"]).optional(),
+  // معرّف حدث الوردية المفتوحة محليًّا لربط الفاتورة بها على الخادم (اختياري).
+  shiftClientEventId: z.string().optional(),
   createdAt: z.string(),
 });
 export type SaleSyncEvent = z.infer<typeof saleSyncEventSchema>;
 
+// يحمل دفعة الفواتير وأحداث الورديات معًا. كلاهما اختياري (قد تُدفع وردية بلا فواتير
+// أو فواتير بلا أحداث وردية). تُعالَج أحداث الورديات أولًا لتتمكّن الفواتير من الارتباط بها.
 export const syncPushSchema = z.object({
-  events: z.array(saleSyncEventSchema).min(1),
+  events: z.array(saleSyncEventSchema).default([]),
+  shiftEvents: z.array(shiftSyncEventSchema).default([]),
 });
 export type SyncPushInput = z.infer<typeof syncPushSchema>;
