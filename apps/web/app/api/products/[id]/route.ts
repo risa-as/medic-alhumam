@@ -51,6 +51,10 @@ export function DELETE(_req: Request, { params }: { params: Promise<{ id: string
     await requireRole("ADMIN");
     const { id } = await params;
 
+    // المنتج محذوف مسبقًا (مثلًا من جهاز آخر) ⇒ 404 نظيف بدل خطأ Prisma 500.
+    const existing = await prisma.product.findUnique({ where: { id }, select: { id: true } });
+    if (!existing) throw new ApiError(404, "PRODUCT_NOT_FOUND", "المنتج غير موجود");
+
     // المنتج المرتبط بمبيعات/طلبات جزء من السجل المالي ⇒ يُمنع حذفه (يحافظ على الفواتير والتقارير).
     const [saleCount, orderCount] = await Promise.all([
       prisma.saleItem.count({ where: { productId: id } }),

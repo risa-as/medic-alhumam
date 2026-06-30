@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { LayoutDashboard, BarChart3, Boxes, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, BarChart3, Boxes, Clock, type LucideIcon } from "lucide-react";
 
 const TABS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard/reports", label: "نظرة عامة", icon: LayoutDashboard },
   { href: "/dashboard/reports/financial", label: "الأرباح والخسائر", icon: BarChart3 },
   { href: "/dashboard/reports/inventory", label: "المخزون والركود", icon: Boxes },
+  { href: "/dashboard/reports/shifts", label: "الورديات", icon: Clock },
 ];
 
 export function ReportsNav() {

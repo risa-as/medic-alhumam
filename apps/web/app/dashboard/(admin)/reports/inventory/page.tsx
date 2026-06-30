@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Boxes, Wallet, TrendingUp, PackageX, CalendarX, AlertTriangle, Tags } from "lucide-react";
+import { Boxes, Wallet, TrendingUp, PackageX, AlertTriangle, Tags } from "lucide-react";
 import { apiFetch } from "@/lib/fetcher";
 import { fmt, fmtDate } from "../_components/helpers";
 import type { InventoryReport } from "../_components/types";
@@ -34,11 +34,10 @@ const WINDOWS = [30, 60, 90];
 
 export default function InventoryReportPage() {
   const [staleDays, setStaleDays] = useState(60);
-  const [expiryDays, setExpiryDays] = useState(60);
 
   const { data: d, isLoading, error } = useQuery({
-    queryKey: ["report-inventory", staleDays, expiryDays],
-    queryFn: () => apiFetch<InventoryReport>(`/reports/inventory?staleDays=${staleDays}&expiryDays=${expiryDays}`),
+    queryKey: ["report-inventory", staleDays],
+    queryFn: () => apiFetch<InventoryReport>(`/reports/inventory?staleDays=${staleDays}`),
   });
 
   if (isLoading) {
@@ -88,47 +87,6 @@ export default function InventoryReportPage() {
                   <td className="px-3 py-2.5 text-txt-muted">{fmtDate(p.lastUpdated)}</td>
                 </tr>
               ))}
-            </Table>
-          </>
-        )}
-      </Card>
-
-      {/* ─── قرب انتهاء الصلاحية ─── */}
-      <Card
-        title="قرب انتهاء الصلاحية"
-        icon={<CalendarX className="h-4 w-4 text-state-danger" />}
-        badge={
-          <div className="flex items-center gap-1">
-            <span className="ml-2 text-[11px] text-txt-muted">خلال</span>
-            {WINDOWS.map((w) => (
-              <button key={w} onClick={() => setExpiryDays(w)} className={["rounded border px-2 py-1 text-[11px] font-medium transition-all", expiryDays === w ? "border-primary bg-primary text-white" : "border-border text-txt-secondary hover:bg-app-bg"].join(" ")}>{w} يوم</button>
-            ))}
-          </div>
-        }
-      >
-        {d.expiring.length === 0 ? (
-          <p className="py-6 text-center text-sm text-txt-muted">لا توجد دفعات تنتهي خلال {expiryDays} يومًا ✓</p>
-        ) : (
-          <>
-            <p className="mb-3 text-xs text-txt-muted">{fmt(d.expiringCount)} دفعة بقيمة <span className="font-semibold text-state-danger">{fmt(d.expiringValue)} د.ع</span>{d.expiredCount > 0 ? ` — منها ${fmt(d.expiredCount)} منتهية الصلاحية فعلًا` : ""}</p>
-            <Table head={["#", "المنتج", "المتبقّي", "قيمة التكلفة", "تاريخ الانتهاء", "المتبقّي للانتهاء"]}>
-              {d.expiring.map((b, i) => {
-                const expired = b.daysLeft < 0;
-                return (
-                  <tr key={b.id} className="border-b border-border-light last:border-b-0 hover:bg-[#F7F9FC]">
-                    <td className="px-3 py-2.5 text-xs text-txt-muted">{i + 1}</td>
-                    <td className="px-3 py-2.5 font-medium text-txt">{b.nameAr}</td>
-                    <td className="px-3 py-2.5 text-txt">{fmt(b.remaining)}</td>
-                    <td className="px-3 py-2.5 text-txt">{fmt(b.value)} د.ع</td>
-                    <td className="px-3 py-2.5 text-txt-muted">{fmtDate(b.expiryDate)}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${expired ? "bg-state-danger-light text-state-danger" : b.daysLeft <= 14 ? "bg-state-warning-light text-state-warning" : "bg-app-bg text-txt-secondary"}`}>
-                        {expired ? "منتهٍ" : `${b.daysLeft} يوم`}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
             </Table>
           </>
         )}

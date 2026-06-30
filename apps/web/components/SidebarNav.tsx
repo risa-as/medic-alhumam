@@ -46,8 +46,15 @@ export interface SidebarNavItem {
 /**
  * روابط الشريط الجانبي للوحة التحكم مع إبراز الصفحة النشطة.
  * عميل (client) لأنه يعتمد على usePathname لمعرفة المسار الحالي.
+ * onNavigate: يُستدعى عند النقر على رابط (لإغلاق قائمة الجوال).
  */
-export function SidebarNav({ items }: { items: SidebarNavItem[] }) {
+export function SidebarNav({
+  items,
+  onNavigate,
+}: {
+  items: SidebarNavItem[];
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
   function isActive(href: string) {
@@ -65,6 +72,7 @@ export function SidebarNav({ items }: { items: SidebarNavItem[] }) {
           <Link
             key={n.href}
             href={n.href}
+            onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={`sidebar-nav-link${active ? " active" : ""}`}
           >

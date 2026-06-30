@@ -10,6 +10,10 @@ const createSchema = saleCreateSchema.extend({
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
   platform: z.enum(["POS_MOBILE", "WEB"]).optional(),
+  // وردية نقطة البيع التي تُسجَّل فيها الفاتورة (الهاتف).
+  shiftId: z.string().optional(),
+  // طريقة الدفع (نقدي/بطاقة/آجل) لتفصيل مبالغ الوردية.
+  paymentMethod: z.enum(["CASH", "CARD", "CREDIT"]).optional(),
 });
 
 export function POST(req: Request) {

@@ -379,10 +379,10 @@ export default function InventoryPage() {
 
       {/* ─── الجدول ─── */}
       <div
-        className="overflow-hidden rounded-lg border border-border bg-surface"
+        className="overflow-x-auto rounded-lg border border-border bg-surface"
         style={{ boxShadow: "var(--shadow-sm)" }}
       >
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse whitespace-nowrap text-sm">
           <thead>
             <tr className="border-b-2 border-border bg-app-bg">
               <th className="w-px whitespace-nowrap px-4 py-3 text-right text-xs font-semibold text-txt-secondary">
@@ -444,7 +444,7 @@ export default function InventoryPage() {
                       .join(" ")}
                   >
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-txt-muted">{index + 1}</td>
-                    {/* اسم المنتج + الوصف */}
+                    {/* اسم المنتج */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {/* أيقونة المنتج */}
@@ -463,13 +463,14 @@ export default function InventoryPage() {
                             <Package className="h-5 w-5" />
                           )}
                         </div>
-                        <div>
-                          <p className="font-medium text-txt">{p.nameAr}</p>
-                          {p.description && (
-                            <p className="text-[11px] text-txt-muted line-clamp-1">
-                              {p.description}
-                            </p>
-                          )}
+                        <div className="min-w-0">
+                          {/* الوصف مخفي في الجدول — يظهر فقط داخل نموذج التعديل */}
+                          <p
+                            className="max-w-[220px] truncate font-medium text-txt"
+                            title={p.description ?? undefined}
+                          >
+                            {p.nameAr}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -633,7 +634,7 @@ export default function InventoryPage() {
           }}
         >
           <div
-            className="w-[380px] overflow-hidden rounded-lg bg-surface"
+            className="w-[380px] max-w-[calc(100vw-32px)] overflow-hidden rounded-lg bg-surface"
             style={{ boxShadow: "var(--shadow-lg)" }}
           >
             {/* رأس الـ modal */}

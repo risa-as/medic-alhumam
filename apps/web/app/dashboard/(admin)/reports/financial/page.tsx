@@ -1,16 +1,24 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import {
   Area, AreaChart, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { Wallet, TrendingUp, TrendingDown, Landmark, BadgePercent, Receipt, Banknote, Tags, Users, Globe, CalendarDays, Coins } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, Landmark, BadgePercent, Receipt, ReceiptText, Banknote, Tags, Users, Globe, CalendarDays, Coins, ChevronRight, ChevronLeft } from "lucide-react";
 import { apiFetch } from "@/lib/fetcher";
 import { KpiCard } from "../_components/KpiCard";
 import { fmt, fmtDate, usePeriod } from "../_components/helpers";
 import { expenseLabel, expenseColor } from "@/lib/expense-categories";
 import type { FinancialReport } from "../_components/types";
+import type { Sale } from "@/lib/types";
+
+const PAGE_SIZE = 100;
+const PAY_LABEL: Record<string, string> = { CASH: "نقدي", CREDIT: "آجل", PARTIAL: "جزئي" };
+const dtTime = (iso: string) =>
+  new Date(iso).toLocaleString("ar-IQ", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 const PAY_COLORS: Record<string, string> = { CASH: "#1A7F5A", CREDIT: "#B45309", PARTIAL: "#7C3AED" };
 
@@ -34,11 +42,49 @@ const Card = ({ title, icon, children, className = "" }: { title: string; icon: 
 );
 
 export default function FinancialReportPage() {
-  const { qs, g } = usePeriod();
+  const { qs, g, from, to } = usePeriod();
+  const sp = useSearchParams();
+  // فلتر نطاق الوقت اليومي (HH:MM) + إزاحة المنطقة الزمنية للمتصفّح لاحتسابه على الخادم.
+  const fromTime = sp.get("fromTime") ?? "";
+  const toTime = sp.get("toTime") ?? "";
+  const timeQs =
+    fromTime && toTime
+      ? `&fromTime=${encodeURIComponent(fromTime)}&toTime=${encodeURIComponent(toTime)}&tzOffset=${new Date().getTimezoneOffset()}`
+      : "";
+  const fullQs = qs + timeQs;
+
   const { data: d, isLoading, error } = useQuery({
-    queryKey: ["report-financial", qs],
-    queryFn: () => apiFetch<FinancialReport>(`/reports/financial?${qs}`),
+    queryKey: ["report-financial", fullQs],
+    queryFn: () => apiFetch<FinancialReport>(`/reports/financial?${fullQs}`),
   });
+
+  // ─── سجل الفواتير ضمن الفترة (يُرقَّم 100 صف/صفحة) ───
+  const salesLogQ = useQuery({
+    queryKey: ["financial-sales-log", from, to],
+    queryFn: () =>
+      apiFetch<{ data: Sale[] }>(
+        `/sales?from=${from}T00:00:00.000Z&to=${to}T23:59:59.999Z&limit=500`,
+      ),
+  });
+  const [logPage, setLogPage] = useState(1);
+  useEffect(() => { setLogPage(1); }, [from, to, fromTime, toTime]);
+
+  // فلتر نطاق الوقت اليومي على سجل الفواتير (جهة العميل — بتوقيت المتصفّح المحلي)
+  function inTimeWindow(iso: string): boolean {
+    if (!fromTime || !toTime) return true;
+    const dd = new Date(iso);
+    const m = dd.getHours() * 60 + dd.getMinutes();
+    const [fh = 0, fm = 0] = fromTime.split(":").map(Number);
+    const [th = 0, tm = 0] = toTime.split(":").map(Number);
+    const fMin = fh * 60 + fm;
+    const tMin = th * 60 + tm;
+    if (fMin === tMin) return true;
+    return fMin <= tMin ? m >= fMin && m < tMin : m >= fMin || m < tMin;
+  }
+  const logSales = (salesLogQ.data?.data ?? []).filter((s) => inTimeWindow(s.createdAt));
+  const logTotalPages = Math.max(1, Math.ceil(logSales.length / PAGE_SIZE));
+  const logPageSafe = Math.min(logPage, logTotalPages);
+  const logPageSales = logSales.slice((logPageSafe - 1) * PAGE_SIZE, logPageSafe * PAGE_SIZE);
 
   if (isLoading) {
     return <div className="flex h-48 items-center justify-center gap-2 text-txt-muted"><span className="spinner spinner-dark" /> جارٍ تحميل التقرير المالي...</div>;
@@ -165,8 +211,8 @@ export default function FinancialReportPage() {
         {d.topProducts.length === 0 ? (
           <p className="text-xs text-txt-muted">لا توجد بيانات</p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border">
-            <table className="w-full border-collapse text-sm">
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full border-collapse whitespace-nowrap text-sm">
               <thead className="border-b-2 border-border bg-app-bg">
                 <tr>
                   {["#", "المنتج", "الكمية", "الإيراد", "الربح"].map((h) => <th key={h} className="px-3 py-2.5 text-right text-xs font-semibold text-txt-secondary">{h}</th>)}
@@ -220,8 +266,8 @@ export default function FinancialReportPage() {
       {/* ─── الجدول التفصيلي ─── */}
       <Card title={`التفصيل ${g === "day" ? "اليومي" : "الأسبوعي"}`} icon={<CalendarDays className="h-4 w-4 text-primary" />}>
         {d.totalCount === 0 ? <p className="text-xs text-txt-muted">لا توجد بيانات</p> : (
-          <div className="overflow-hidden rounded-lg border border-border">
-            <table className="w-full border-collapse text-sm">
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full border-collapse whitespace-nowrap text-sm">
               <thead className="border-b-2 border-border bg-app-bg">
                 <tr>{["#", "التاريخ", "الفواتير", "الإيراد", "الربح"].map((h) => <th key={h} className="px-3 py-2.5 text-right text-xs font-semibold text-txt-secondary">{h}</th>)}</tr>
               </thead>
@@ -238,6 +284,66 @@ export default function FinancialReportPage() {
               </tbody>
             </table>
           </div>
+        )}
+      </Card>
+
+      {/* ─── سجل الفواتير (مُرقَّم 100 صف/صفحة) ─── */}
+      <Card title="سجل الفواتير" icon={<ReceiptText className="h-4 w-4 text-primary" />}>
+        {salesLogQ.isLoading ? (
+          <div className="flex items-center gap-2 py-6 text-xs text-txt-muted"><span className="spinner spinner-dark" /> جارٍ تحميل الفواتير...</div>
+        ) : logSales.length === 0 ? (
+          <p className="py-3 text-xs text-txt-muted">لا توجد فواتير ضمن هذه الفترة</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full border-collapse whitespace-nowrap text-sm">
+                <thead className="border-b-2 border-border bg-app-bg">
+                  <tr>
+                    {["#", "رقم الفاتورة", "التاريخ والوقت", "الزبون", "نوع الدفع", "المتبقّي", "الإجمالي"].map((h) => (
+                      <th key={h} className="px-3 py-2.5 text-right text-xs font-semibold text-txt-secondary">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {logPageSales.map((s, i) => (
+                    <tr key={s.id} className="border-b border-border-light last:border-b-0 hover:bg-[#F7F9FC]">
+                      <td className="px-3 py-2.5 text-xs text-txt-muted">{(logPageSafe - 1) * PAGE_SIZE + i + 1}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs font-bold text-primary">{s.invoiceNo}</td>
+                      <td className="px-3 py-2.5 text-xs text-txt-secondary">{dtTime(s.createdAt)}</td>
+                      <td className="px-3 py-2.5 text-txt">{s.customerName ?? <span className="text-txt-muted">—</span>}</td>
+                      <td className="px-3 py-2.5 text-xs text-txt-secondary">{PAY_LABEL[s.paymentType] ?? s.paymentType}</td>
+                      <td className="px-3 py-2.5 text-state-warning">{s.remaining > 0 ? `${fmt(s.remaining)} د.ع` : "—"}</td>
+                      <td className="px-3 py-2.5 font-bold text-txt">{fmt(s.total)} د.ع</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ترقيم الصفحات */}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-txt-muted">
+                {fmt(logSales.length)} فاتورة · عرض {fmt((logPageSafe - 1) * PAGE_SIZE + 1)}–{fmt(Math.min(logPageSafe * PAGE_SIZE, logSales.length))}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setLogPage((p) => Math.max(1, p - 1))}
+                  disabled={logPageSafe <= 1}
+                  className="inline-flex items-center gap-1 rounded border border-border bg-surface px-3 py-1.5 text-xs font-medium text-txt-secondary transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" /> السابق
+                </button>
+                <span className="px-2 text-xs font-semibold text-txt">صفحة {fmt(logPageSafe)} من {fmt(logTotalPages)}</span>
+                <button
+                  onClick={() => setLogPage((p) => Math.min(logTotalPages, p + 1))}
+                  disabled={logPageSafe >= logTotalPages}
+                  className="inline-flex items-center gap-1 rounded border border-border bg-surface px-3 py-1.5 text-xs font-medium text-txt-secondary transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  التالي <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </Card>
     </div>

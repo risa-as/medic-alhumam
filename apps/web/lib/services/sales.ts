@@ -76,11 +76,29 @@ async function resolveCustomerId(
  * يخصم المخزون، يسجّل حركات البيع، وينشئ دينًا عند وجود متبقٍّ.
  */
 export async function createSaleAuthoritative(
-  input: SaleCreateInput & { customerName?: string; customerPhone?: string },
+  input: SaleCreateInput & {
+    customerName?: string;
+    customerPhone?: string;
+    shiftId?: string | null;
+    paymentMethod?: "CASH" | "CARD" | "CREDIT" | null;
+  },
   userId: string,
   platform: "POS_MOBILE" | "WEB" = "WEB",
 ) {
   return prisma.$transaction(async (tx) => {
+    // ربط الفاتورة بوردية مفتوحة للمستخدم (نقطة البيع). نتحقّق أنها مفتوحة وتخصّه.
+    let shiftId: string | null = null;
+    if (input.shiftId) {
+      const shift = await tx.shift.findUnique({
+        where: { id: input.shiftId },
+        select: { id: true, userId: true, status: true },
+      });
+      if (!shift || shift.status !== "OPEN" || shift.userId !== userId) {
+        throw new ApiError(422, "INVALID_SHIFT", "الوردية غير مفتوحة أو لا تخصّك");
+      }
+      shiftId = shift.id;
+    }
+
     const ids = input.items.map((i) => i.productId);
     const products = await tx.product.findMany({ where: { id: { in: ids } } });
     const byId = new Map(products.map((p) => [p.id, p]));
@@ -135,8 +153,10 @@ export async function createSaleAuthoritative(
         paid: totals.paid,
         remaining: totals.remaining,
         paymentType: totals.paymentType,
+        paymentMethod: input.paymentMethod ?? (totals.paymentType === "CASH" ? "CASH" : "CREDIT"),
         platform,
         userId,
+        shiftId,
         items: {
           create: lineInputs.map((l, idx) => ({
             productId: l.productId,
@@ -183,6 +203,8 @@ export interface SyncResult {
   clientEventId: string;
   status: "ok" | "duplicate" | "error";
   saleId?: string;
+  /** رقم الفاتورة النهائي على الخادم (قد يختلف عن المحلي عند فضّ تضارب الأرقام). */
+  invoiceNo?: string;
   message?: string;
 }
 
@@ -190,11 +212,15 @@ export interface SyncResult {
  * يسجّل فاتورة مكتملة محليًا (offline) كما هي (المصدر = الجهاز)، بشكل idempotent.
  * يخصم المخزون (مع عدم السماح بالسالب)، ويسجّل الحركات، وينشئ دينًا عند الحاجة.
  */
-export async function recordSyncedSale(event: SaleSyncEvent, fallbackUserId: string): Promise<SyncResult> {
+export async function recordSyncedSale(
+  event: SaleSyncEvent,
+  fallbackUserId: string,
+  shiftId?: string | null,
+): Promise<SyncResult> {
   try {
     const existing = await prisma.sale.findUnique({ where: { clientEventId: event.clientEventId } });
     if (existing) {
-      return { clientEventId: event.clientEventId, status: "duplicate", saleId: existing.id };
+      return { clientEventId: event.clientEventId, status: "duplicate", saleId: existing.id, invoiceNo: existing.invoiceNo };
     }
 
     // نسبة الفاتورة للمستخدم الفعّال لحظة إنشائها على الجهاز؛ نتأكّد أنه موجود وإلا نرجع للمستخدم الافتراضي (FR-047)
@@ -213,6 +239,20 @@ export async function recordSyncedSale(event: SaleSyncEvent, fallbackUserId: str
         });
       }
 
+      // أرقام الفواتير تُولَّد محليًّا على كل جهاز، فقد تتضارب بين أجهزة متعددة على نفس الخادم.
+      // قيد الفرادة عالمي ⇒ عند التضارب نُضيف لاحقة فريدة (لا نرفض الفاتورة) لأن المعرّف
+      // الحقيقي للـ idempotency هو clientEventId لا رقم الفاتورة.
+      let invoiceNo = event.invoiceNo;
+      if (await tx.sale.findFirst({ where: { invoiceNo }, select: { id: true } })) {
+        const suffix = event.clientEventId.replace(/-/g, "").slice(0, 4);
+        invoiceNo = `${event.invoiceNo}-${suffix}`;
+        let n = 1;
+        while (await tx.sale.findFirst({ where: { invoiceNo }, select: { id: true } })) {
+          n++;
+          invoiceNo = `${event.invoiceNo}-${suffix}-${n}`;
+        }
+      }
+
       // تخصيص FEFO + تكلفة البضاعة المباعة لكل سطر (تسلسليًا) قبل إنشاء الفاتورة
       const costTotals: (number | null)[] = [];
       for (const l of event.items) {
@@ -221,7 +261,7 @@ export async function recordSyncedSale(event: SaleSyncEvent, fallbackUserId: str
 
       const created = await tx.sale.create({
         data: {
-          invoiceNo: event.invoiceNo,
+          invoiceNo,
           clientEventId: event.clientEventId,
           customerId,
           customerName: event.customerName ?? null,
@@ -232,8 +272,10 @@ export async function recordSyncedSale(event: SaleSyncEvent, fallbackUserId: str
           paid: event.paid,
           remaining: event.remaining,
           paymentType: event.paymentType,
+          paymentMethod: event.paymentMethod ?? (event.paymentType === "CASH" ? "CASH" : "CREDIT"),
           platform: "POS_DESKTOP",
           userId,
+          shiftId: shiftId ?? null,
           createdAt: new Date(event.createdAt),
           items: {
             create: event.items.map((l, idx) => ({
@@ -288,7 +330,7 @@ export async function recordSyncedSale(event: SaleSyncEvent, fallbackUserId: str
       return created;
     }, { maxWait: 15000, timeout: 30000 });
 
-    return { clientEventId: event.clientEventId, status: "ok", saleId: sale.id };
+    return { clientEventId: event.clientEventId, status: "ok", saleId: sale.id, invoiceNo: sale.invoiceNo };
   } catch (e) {
     return {
       clientEventId: event.clientEventId,

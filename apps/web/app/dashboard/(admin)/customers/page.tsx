@@ -163,9 +163,9 @@ export default function CustomersPage() {
         </div>
       )}
 
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row">
         {/* ─── قائمة الزبائن ─── */}
-        <div className="w-72 shrink-0">
+        <div className="w-full shrink-0 lg:w-72">
           <div className="relative mb-3">
             <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-txt-muted" />
             <input
@@ -291,7 +291,7 @@ function CustomerDetailPanel({ customer, onEdit, onDelete }: { customer: Custome
         </div>
 
         {/* بطاقات ملخّص */}
-        <div className="mt-4 grid grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard label="الرصيد المستحق" value={`${fmt(customer.balance)} د.ع`} accentColor={customer.balance > 0 ? "#B91C1C" : "#1A7F5A"} icon={<Wallet className="h-[18px] w-[18px]" />} />
           <StatCard label="إجمالي المبيعات" value={`${fmt(customer.salesTotal)} د.ع`} accentColor="#1A7F5A" icon={<Receipt className="h-[18px] w-[18px]" />} />
           <StatCard label="عدد الفواتير" value={fmt(customer.salesCount)} accentColor="#1D4ED8" icon={<FileText className="h-[18px] w-[18px]" />} />

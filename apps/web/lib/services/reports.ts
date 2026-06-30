@@ -14,6 +14,23 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 const DAY_MS = 86_400_000;
 
+/** فلتر نطاق وقت يومي يُطبَّق على كل يوم ضمن المدى. fromMin/toMin دقائق من منتصف الليل
+ *  بالتوقيت المحلي، و tzOffset = Date.getTimezoneOffset() (سالب لما يسبق UTC، مثل العراق -180). */
+export interface TimeOfDayFilter {
+  fromMin: number;
+  toMin: number;
+  tzOffset: number;
+}
+
+/** هل يقع التوقيت (UTC) ضمن نطاق الوقت اليومي المحلي؟ يدعم النطاق العابر لمنتصف الليل. */
+function inTimeWindow(createdAt: Date, tf: TimeOfDayFilter | null): boolean {
+  if (!tf) return true;
+  const localMin = ((Math.floor(createdAt.getTime() / 60000 - tf.tzOffset) % 1440) + 1440) % 1440;
+  return tf.fromMin <= tf.toMin
+    ? localMin >= tf.fromMin && localMin < tf.toMin
+    : localMin >= tf.fromMin || localMin < tf.toMin;
+}
+
 function dayKey(d: Date): string {
   return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
@@ -24,33 +41,36 @@ function weekKey(d: Date): string {
   return c.toISOString().slice(0, 10);
 }
 
-/** إجماليات مالية مختصرة لنافذة زمنية — تُستخدم للمقارنة بالفترة السابقة. */
-async function periodTotals(from: Date, to: Date) {
-  const [rev, cost, exp] = await Promise.all([
-    prisma.sale.aggregate({
-      where: { createdAt: { gte: from, lte: to } },
-      _sum: { total: true, discount: true },
-      _count: { _all: true },
-    }),
-    prisma.saleItem.aggregate({
-      where: { costTotal: { not: null }, sale: { createdAt: { gte: from, lte: to } } },
-      _sum: { costTotal: true, lineTotal: true },
-    }),
+/** إجماليات مالية مختصرة لنافذة زمنية — تُستخدم للمقارنة بالفترة السابقة (مع فلتر الوقت اليومي). */
+async function periodTotals(from: Date, to: Date, tf: TimeOfDayFilter | null) {
+  const rows = await prisma.sale.findMany({
+    where: { createdAt: { gte: from, lte: to } },
+    select: { id: true, total: true, discount: true, createdAt: true },
+  });
+  const sales = tf ? rows.filter((s) => inTimeWindow(s.createdAt, tf)) : rows;
+  const ids = sales.map((s) => s.id);
+  const [cost, exp] = await Promise.all([
+    ids.length
+      ? prisma.saleItem.aggregate({
+          where: { saleId: { in: ids }, costTotal: { not: null } },
+          _sum: { costTotal: true, lineTotal: true },
+        })
+      : null,
     prisma.expense.aggregate({
       where: { spentAt: { gte: from, lte: to } },
       _sum: { amount: true },
     }),
   ]);
-  const totalRevenue = Number(rev._sum.total ?? 0);
-  const totalCount = rev._count._all;
-  const totalCost = Number(cost._sum.costTotal ?? 0);
-  const costedRevenue = Number(cost._sum.lineTotal ?? 0);
+  const totalRevenue = sales.reduce((s, x) => s + Number(x.total), 0);
+  const totalCount = sales.length;
+  const totalCost = Number(cost?._sum.costTotal ?? 0);
+  const costedRevenue = Number(cost?._sum.lineTotal ?? 0);
   const totalProfit = costedRevenue - totalCost;
   const expensesTotal = Number(exp._sum.amount ?? 0);
   return {
     totalRevenue,
     totalCount,
-    discountsGiven: Number(rev._sum.discount ?? 0),
+    discountsGiven: sales.reduce((s, x) => s + Number(x.discount), 0),
     totalProfit,
     avgOrder: totalCount ? Math.round(totalRevenue / totalCount) : 0,
     expensesTotal,
@@ -62,12 +82,17 @@ async function periodTotals(from: Date, to: Date) {
  * التقرير المالي: إجماليات + ربح FEFO + مقارنة بالفترة السابقة + سلسلة زمنية
  * (إيراد/ربح) + تفصيل حسب طريقة الدفع/الفئة/الموظف/المنصّة + أكثر المنتجات.
  */
-export async function getFinancialReport(from: Date, to: Date, groupBy: "day" | "week") {
+export async function getFinancialReport(
+  from: Date,
+  to: Date,
+  groupBy: "day" | "week",
+  timeFilter: TimeOfDayFilter | null = null,
+) {
   const len = to.getTime() - from.getTime();
   const prevTo = from;
   const prevFrom = new Date(from.getTime() - len);
 
-  const sales = await prisma.sale.findMany({
+  const allSales = await prisma.sale.findMany({
     where: { createdAt: { gte: from, lte: to } },
     select: {
       id: true,
@@ -80,6 +105,8 @@ export async function getFinancialReport(from: Date, to: Date, groupBy: "day" | 
       user: { select: { name: true } },
     },
   });
+  // فلتر نطاق الوقت اليومي (مثلًا 8ص–4م) يُطبَّق على كل يوم ضمن المدى المختار.
+  const sales = timeFilter ? allSales.filter((s) => inTimeWindow(s.createdAt, timeFilter)) : allSales;
   const saleIds = sales.map((s) => s.id);
 
   const [costAgg, profitBySale, allByProduct, costedByProduct, previous, expenses] = await Promise.all([
@@ -110,7 +137,7 @@ export async function getFinancialReport(from: Date, to: Date, groupBy: "day" | 
           _sum: { lineTotal: true, costTotal: true },
         })
       : [],
-    periodTotals(prevFrom, prevTo),
+    periodTotals(prevFrom, prevTo, timeFilter),
     getExpensesSummary(from, to),
   ]);
 

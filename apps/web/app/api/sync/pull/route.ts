@@ -26,6 +26,10 @@ export function GET(req: Request) {
       },
     });
 
+    // قائمة كل معرّفات المنتجات الحالية (كاملة، بغضّ النظر عن since) — تتيح للعميل
+    // تقليم المنتجات المحذوفة من مرآته المحلية (الحذف على الخادم ذرّي/فعلي، لا يُلتقط بـ since).
+    const allProductIds = await prisma.product.findMany({ select: { id: true } });
+
     // المستخدمون لتسجيل الدخول الأوفلاين على الديسكتوب (FR-052) — محميّ بـ SYNC_SECRET (ثقة الجهاز)
     const users = await prisma.user.findMany({
       select: { id: true, name: true, email: true, passwordHash: true, role: true },
@@ -49,6 +53,7 @@ export function GET(req: Request) {
     return NextResponse.json({
       serverTime: new Date().toISOString(),
       products: products.map((p) => ({ ...p, salePrice: Number(p.salePrice) })),
+      productIds: allProductIds.map((p) => p.id),
       users,
       customers: customers.map((c) => ({ ...c, balance: balanceByCustomer.get(c.id) ?? 0 })),
     });

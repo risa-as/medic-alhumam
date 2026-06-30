@@ -27,8 +27,8 @@ export function DataTable<T extends { id: string }>({
   rowClassName,
 }: DataTableProps<T>) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
-      <table className="w-full border-collapse text-sm">
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full border-collapse whitespace-nowrap text-sm">
         <thead className="border-b-2 border-border bg-app-bg">
           <tr>
             <th className="w-px whitespace-nowrap px-3 py-2.5 text-right text-xs font-semibold text-txt-secondary">#</th>

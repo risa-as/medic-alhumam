@@ -239,7 +239,39 @@ function EditOrderModal({ order, onClose, onSaved }: {
   const [err, setErr]         = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // كميات وأسعار الأصناف القابلة للتعديل (كنصوص للتحكّم السلس في الإدخال).
+  const [items, setItems] = useState(() =>
+    (order.items ?? []).map((i) => ({
+      id: i.id,
+      name: i.product?.nameAr ?? i.productId,
+      quantity: String(i.quantity),
+      unitPrice: String(i.unitPrice),
+    })),
+  );
+
+  function updateItem(id: string, field: "quantity" | "unitPrice", value: string) {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
+  }
+
+  const itemsTotal = items.reduce(
+    (s, it) => s + (Number(it.unitPrice) || 0) * (Number(it.quantity) || 0),
+    0,
+  );
+
   async function submit(v: EditOrderForm) {
+    // التحقّق من كميات/أسعار الأصناف قبل الإرسال.
+    for (const it of items) {
+      const qty = Number(it.quantity);
+      const price = Number(it.unitPrice);
+      if (!Number.isInteger(qty) || qty < 1) {
+        setErr(`كمية «${it.name}» يجب أن تكون عددًا صحيحًا أكبر من صفر`);
+        return;
+      }
+      if (Number.isNaN(price) || price < 0) {
+        setErr(`سعر «${it.name}» غير صالح`);
+        return;
+      }
+    }
     setLoading(true);
     setErr(null);
     try {
@@ -251,6 +283,13 @@ function EditOrderModal({ order, onClose, onSaved }: {
           governorate: v.governorate,
           customerAddress: v.customerAddress?.trim() ? v.customerAddress.trim() : null,
           notes: v.notes?.trim() ? v.notes.trim() : null,
+          ...(items.length > 0 && {
+            items: items.map((it) => ({
+              id: it.id,
+              quantity: Number(it.quantity),
+              unitPrice: Number(it.unitPrice),
+            })),
+          }),
         }),
       });
       onSaved();
@@ -288,6 +327,54 @@ function EditOrderModal({ order, onClose, onSaved }: {
             {IRAQ_GOVERNORATES.map((g) => <option key={g} value={g}>{g}</option>)}
           </SelectField>
           <TextareaField label="العنوان" rows={2} {...register("customerAddress")} />
+
+          {/* تعديل الأصناف: الكمية والسعر */}
+          {items.length > 0 && (
+            <div className="pt-2">
+              <p className="mb-2 border-b border-border-light pb-1.5 text-xs font-semibold text-txt-secondary">
+                أصناف الطلب (الكمية والسعر)
+              </p>
+              <div className="space-y-2">
+                {/* رؤوس الأعمدة */}
+                <div className="flex items-center gap-2 px-1 text-[11px] font-semibold text-txt-muted">
+                  <span className="flex-1">المنتج</span>
+                  <span className="w-20 text-center">الكمية</span>
+                  <span className="w-28 text-center">سعر الوحدة</span>
+                </div>
+                {items.map((it) => (
+                  <div key={it.id} className="flex items-center gap-2">
+                    <span className="flex-1 truncate text-sm text-txt" title={it.name}>{it.name}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      dir="ltr"
+                      value={it.quantity}
+                      onChange={(e) => updateItem(it.id, "quantity", e.target.value)}
+                      className="w-20 rounded border border-border bg-surface px-2 py-1.5 text-center text-sm text-txt outline-none transition-colors focus:border-primary"
+                      aria-label={`كمية ${it.name}`}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      dir="ltr"
+                      value={it.unitPrice}
+                      onChange={(e) => updateItem(it.id, "unitPrice", e.target.value)}
+                      className="w-28 rounded border border-border bg-surface px-2 py-1.5 text-center text-sm text-txt outline-none transition-colors focus:border-primary"
+                      aria-label={`سعر ${it.name}`}
+                    />
+                  </div>
+                ))}
+                {/* الإجمالي المحدّث */}
+                <div className="flex items-center justify-between border-t border-border-light pt-2 text-sm">
+                  <span className="font-semibold text-txt-secondary">إجمالي الأصناف</span>
+                  <span className="font-bold text-txt">{fmt(itemsTotal)} د.ع</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <TextareaField label="ملاحظات" rows={2} {...register("notes")} />
 
           {err && (

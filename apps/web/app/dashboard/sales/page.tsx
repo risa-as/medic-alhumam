@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Globe, Monitor, Smartphone, Check, Tag, Eye, Receipt, Wallet, Hourglass, Search, X, Stethoscope, Printer, type LucideIcon } from "lucide-react";
+import { Globe, Monitor, Smartphone, Check, Tag, Eye, Receipt, Wallet, Hourglass, Search, X, Stethoscope, Printer, Clock, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/fetcher";
 import type { Sale } from "@/lib/types";
 import { Btn, DataTable, PageHeader, StatCard, StatusBadge, type Column } from "@/components/ui";
@@ -130,6 +130,10 @@ export default function SalesPage() {
   const [period, setPeriod]               = useState<Period>("all");
   const [customFrom, setCustomFrom]       = useState("");
   const [customTo, setCustomTo]           = useState("");
+  // فلتر نطاق الوقت اليومي (يُطبَّق على كل يوم ضمن المدى) — جهة العميل بتوقيت المتصفّح
+  const [timeEnabled, setTimeEnabled]     = useState(false);
+  const [fromTime, setFromTime]           = useState("08:00");
+  const [toTime, setToTime]               = useState("16:00");
 
   /* debounce بسيط لحقل البحث برقم الفاتورة */
   useEffect(() => {
@@ -159,10 +163,24 @@ export default function SalesPage() {
       staleTime: 5 * 60_000,
     }).data?.storeName?.trim() || "متجر المستلزمات الطبية";
 
-  const sales        = salesQ.data?.data ?? [];
-  const totalRevenue = salesQ.data?.totalRevenue ?? 0;
+  /* فلتر نطاق الوقت اليومي (مثلًا 8ص–4م) — يُطبَّق على وقت كل فاتورة بتوقيت المتصفّح المحلي */
+  function inTimeWindow(iso: string): boolean {
+    if (!timeEnabled) return true;
+    const d = new Date(iso);
+    const m = d.getHours() * 60 + d.getMinutes();
+    const [fh = 0, fm = 0] = fromTime.split(":").map(Number);
+    const [th = 0, tm = 0] = toTime.split(":").map(Number);
+    const fromMin = fh * 60 + fm;
+    const toMin = th * 60 + tm;
+    if (fromMin === toMin) return true;
+    return fromMin <= toMin ? m >= fromMin && m < toMin : m >= fromMin || m < toMin;
+  }
+
+  const rawSales     = salesQ.data?.data ?? [];
+  const sales        = rawSales.filter((s) => inTimeWindow(s.createdAt));
+  const totalRevenue = sales.reduce((s, x) => s + x.total, 0);
   const totalRemaining = sales.reduce((s, x) => s + x.remaining, 0);
-  const hasFilter    = !!debouncedInvoice || period !== "all";
+  const hasFilter    = !!debouncedInvoice || period !== "all" || timeEnabled;
 
   const columns: Column<Sale>[] = [
     {
@@ -234,7 +252,7 @@ export default function SalesPage() {
       <PageHeader title="الفواتير" subtitle="سجل المبيعات" />
 
       {/* إحصائيات */}
-      <div className="mb-5 grid grid-cols-3 gap-4">
+      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           label={hasFilter ? "فواتير ضمن الفلتر" : "إجمالي الفواتير"}
           value={sales.length}
@@ -325,6 +343,44 @@ export default function SalesPage() {
             </label>
           </div>
         )}
+
+        {/* نطاق وقت يومي — يُطبَّق على كل يوم ضمن الفترة المختارة */}
+        <div className="flex flex-wrap items-center gap-4 border-t border-border-light pt-3">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[var(--color-primary)]"
+              checked={timeEnabled}
+              onChange={(e) => setTimeEnabled(e.target.checked)}
+            />
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-txt-muted">
+              <Clock className="h-4 w-4 text-primary" /> نطاق وقت يومي
+            </span>
+          </label>
+          {timeEnabled && (
+            <>
+              <label className="flex items-center gap-2 text-xs text-txt-secondary">
+                من الساعة
+                <input
+                  type="time"
+                  value={fromTime}
+                  onChange={(e) => setFromTime(e.target.value)}
+                  className="rounded border border-border bg-surface px-2.5 py-1.5 text-xs text-txt outline-none focus:border-primary"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-txt-secondary">
+                إلى الساعة
+                <input
+                  type="time"
+                  value={toTime}
+                  onChange={(e) => setToTime(e.target.value)}
+                  className="rounded border border-border bg-surface px-2.5 py-1.5 text-xs text-txt outline-none focus:border-primary"
+                />
+              </label>
+              <span className="text-[11px] text-txt-muted">يُطبَّق على كل يوم ضمن الفترة المختارة.</span>
+            </>
+          )}
+        </div>
       </div>
 
       {salesQ.isError && (

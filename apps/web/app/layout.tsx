@@ -15,6 +15,10 @@ const cairo = Cairo({
 export const metadata: Metadata = {
   title: "نظام إدارة متجر المستلزمات الطبية",
   description: "إدارة المخزون والبيع والديون والمتجر الإلكتروني",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({

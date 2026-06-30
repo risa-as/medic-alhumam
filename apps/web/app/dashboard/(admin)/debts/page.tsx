@@ -120,7 +120,7 @@ export default function DebtsPage() {
 
       {/* StatCards */}
       {debtsQ.data && (
-        <div className="mb-6 grid grid-cols-3 gap-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard label="إجمالي الديون"  value={`${fmt(totalAmount)} د.ع`}    accentColor="#B91C1C" icon={<ClipboardList className="h-[18px] w-[18px]" />} />
           <StatCard label="إجمالي المسدّد"  value={`${fmt(totalPaid)} د.ع`}      accentColor="#1A7F5A" icon={<CheckCircle2 className="h-[18px] w-[18px]" />} />
           <StatCard label="المتبقّي"         value={`${fmt(totalRemaining)} د.ع`} accentColor="#B45309" icon={<Hourglass className="h-[18px] w-[18px]" />} />
@@ -181,7 +181,7 @@ export default function DebtsPage() {
           style={{ background: "rgba(13,27,42,0.55)" }}
           onClick={(e) => { if (e.target === e.currentTarget && !payMut.isPending) setPaying(null); }}
         >
-          <div className="modal-box bg-surface rounded-lg shadow-lg p-7 w-[380px]">
+          <div className="modal-box bg-surface rounded-lg shadow-lg p-7 w-[380px] max-w-[calc(100vw-32px)]">
             <h3 className="mb-4 text-base font-bold text-txt">تسجيل دفعة سداد</h3>
             <div className="mb-4 rounded border border-border-light bg-app-bg px-4 py-3 text-sm">
               <p className="text-txt-secondary">

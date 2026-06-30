@@ -233,7 +233,7 @@ export function ProductForm({
       </div>
 
       {/* ─── تخطيط عمودين ─── */}
-      <div className="flex gap-5 items-start">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
 
         {/* ═══ العمود الرئيسي (يمين — أوسع) ═══ */}
         <div className="flex-1 min-w-0 space-y-5">
@@ -412,7 +412,7 @@ export function ProductForm({
         </div>
 
         {/* ═══ العمود الجانبي (يسار — أضيق) ═══ */}
-        <div className="w-64 shrink-0 space-y-4">
+        <div className="w-full shrink-0 space-y-4 lg:w-64">
 
           {/* الأسعار */}
           <FormSection icon={<Wallet className="h-[18px] w-[18px]" />} title="التسعير">
